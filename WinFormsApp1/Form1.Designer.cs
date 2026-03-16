@@ -52,11 +52,10 @@
             тестовыйПримерToolStripMenuItem = new ToolStripMenuItem();
             списокЛитературыToolStripMenuItem = new ToolStripMenuItem();
             исходныйКодПрограммыToolStripMenuItem = new ToolStripMenuItem();
-            пускToolStripMenuItem = new ToolStripMenuItem();
+            startToolStripMenuItem = new ToolStripMenuItem();
             Help_me = new ToolStripMenuItem();
             Call_help = new ToolStripMenuItem();
             About = new ToolStripMenuItem();
-            textBox2 = new TextBox();
             toolStrip1 = new ToolStrip();
             toolStripButton1 = new ToolStripButton();
             toolStripButton2 = new ToolStripButton();
@@ -76,7 +75,7 @@
             // menuStrip1
             // 
             menuStrip1.ImageScalingSize = new Size(20, 20);
-            menuStrip1.Items.AddRange(new ToolStripItem[] { File, Edit, текстToolStripMenuItem, пускToolStripMenuItem, Help_me });
+            menuStrip1.Items.AddRange(new ToolStripItem[] { File, Edit, текстToolStripMenuItem, startToolStripMenuItem, Help_me });
             menuStrip1.Location = new Point(0, 0);
             menuStrip1.Name = "menuStrip1";
             menuStrip1.Size = new Size(891, 28);
@@ -135,49 +134,49 @@
             // Undo
             // 
             Undo.Name = "Undo";
-            Undo.Size = new Size(224, 26);
+            Undo.Size = new Size(186, 26);
             Undo.Text = "Отменить";
             Undo.Click += Undo_Click;
             // 
             // Redo
             // 
             Redo.Name = "Redo";
-            Redo.Size = new Size(224, 26);
+            Redo.Size = new Size(186, 26);
             Redo.Text = "Повторить";
             Redo.Click += Redo_Click;
             // 
             // Cut
             // 
             Cut.Name = "Cut";
-            Cut.Size = new Size(224, 26);
+            Cut.Size = new Size(186, 26);
             Cut.Text = "Вырезать";
             Cut.Click += Cut_Click;
             // 
             // Copy
             // 
             Copy.Name = "Copy";
-            Copy.Size = new Size(224, 26);
+            Copy.Size = new Size(186, 26);
             Copy.Text = "Копировать";
             Copy.Click += Copy_Click;
             // 
             // Paste
             // 
             Paste.Name = "Paste";
-            Paste.Size = new Size(224, 26);
+            Paste.Size = new Size(186, 26);
             Paste.Text = "Вставить";
             Paste.Click += Paste_Click;
             // 
             // Delete
             // 
             Delete.Name = "Delete";
-            Delete.Size = new Size(224, 26);
+            Delete.Size = new Size(186, 26);
             Delete.Text = "Удалить";
             Delete.Click += Delete_Click;
             // 
             // Select_all
             // 
             Select_all.Name = "Select_all";
-            Select_all.Size = new Size(224, 26);
+            Select_all.Size = new Size(186, 26);
             Select_all.Text = "Выделить всё";
             Select_all.Click += SelectAll_Click;
             // 
@@ -230,11 +229,12 @@
             исходныйКодПрограммыToolStripMenuItem.Size = new Size(288, 26);
             исходныйКодПрограммыToolStripMenuItem.Text = "Исходный код программы";
             // 
-            // пускToolStripMenuItem
+            // startToolStripMenuItem
             // 
-            пускToolStripMenuItem.Name = "пускToolStripMenuItem";
-            пускToolStripMenuItem.Size = new Size(55, 24);
-            пускToolStripMenuItem.Text = "Пуск";
+            startToolStripMenuItem.Name = "startToolStripMenuItem";
+            startToolStripMenuItem.Size = new Size(55, 24);
+            startToolStripMenuItem.Text = "Пуск";
+            startToolStripMenuItem.Click += startToolStripMenuItem_Click;
             // 
             // Help_me
             // 
@@ -246,25 +246,16 @@
             // Call_help
             // 
             Call_help.Name = "Call_help";
-            Call_help.Size = new Size(224, 26);
+            Call_help.Size = new Size(197, 26);
             Call_help.Text = "Вызов справки";
             Call_help.Click += Help;
             // 
             // About
             // 
             About.Name = "About";
-            About.Size = new Size(224, 26);
+            About.Size = new Size(197, 26);
             About.Text = "О программе";
             About.Click += About_proga;
-            // 
-            // textBox2
-            // 
-            textBox2.Dock = DockStyle.Fill;
-            textBox2.Location = new Point(3, 352);
-            textBox2.Multiline = true;
-            textBox2.Name = "textBox2";
-            textBox2.Size = new Size(885, 343);
-            textBox2.TabIndex = 5;
             // 
             // toolStrip1
             // 
@@ -362,7 +353,7 @@
             textBox1.Dock = DockStyle.Fill;
             textBox1.Location = new Point(3, 3);
             textBox1.Name = "textBox1";
-            textBox1.Size = new Size(885, 343);
+            textBox1.Size = new Size(885, 692);
             textBox1.TabIndex = 9;
             textBox1.Text = "";
             // 
@@ -370,12 +361,11 @@
             // 
             tableLayoutPanel1.ColumnCount = 1;
             tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            tableLayoutPanel1.Controls.Add(textBox2, 0, 1);
             tableLayoutPanel1.Controls.Add(textBox1, 0, 0);
             tableLayoutPanel1.Dock = DockStyle.Fill;
             tableLayoutPanel1.Location = new Point(0, 55);
             tableLayoutPanel1.Name = "tableLayoutPanel1";
-            tableLayoutPanel1.RowCount = 2;
+            tableLayoutPanel1.RowCount = 1;
             tableLayoutPanel1.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
             tableLayoutPanel1.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
             tableLayoutPanel1.Size = new Size(891, 698);
@@ -398,7 +388,6 @@
             toolStrip1.ResumeLayout(false);
             toolStrip1.PerformLayout();
             tableLayoutPanel1.ResumeLayout(false);
-            tableLayoutPanel1.PerformLayout();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -427,9 +416,8 @@
         private ToolStripMenuItem тестовыйПримерToolStripMenuItem;
         private ToolStripMenuItem списокЛитературыToolStripMenuItem;
         private ToolStripMenuItem исходныйКодПрограммыToolStripMenuItem;
-        private ToolStripMenuItem пускToolStripMenuItem;
+        private ToolStripMenuItem startToolStripMenuItem;
         private ToolStripMenuItem Help_me;
-        private TextBox textBox2;
         private ToolStripMenuItem Call_help;
         private ToolStripMenuItem About;
         private ToolStrip toolStrip1;

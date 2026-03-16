@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Windows.Forms;
 using System.Drawing;
+using System.Text.RegularExpressions;
 
 namespace WinFormsApp1
 {
@@ -12,23 +13,141 @@ namespace WinFormsApp1
         private ToolStripStatusLabel statusLabel;
         private ToolStripStatusLabel lineColumnLabel;
         private ToolStripStatusLabel languageLabel;
-        private System.Windows.Forms.Timer statusTimer;
-
-        private Panel lineNumbersPanel;
+        private Dictionary<TabPage, bool> isModified = new Dictionary<TabPage, bool>();
         private bool isUpdatingLineNumbers = false;
-
         private Dictionary<TabPage, string> filePaths = new Dictionary<TabPage, string>();
-
         private bool isRussianLanguage = true;
+        private Panel outputPanel;
+        private DataGridView[] errorGridViews = new DataGridView[5];
+        private RichTextBox outputTextBox;
+        private TabControl errorTabControl;
+        private LexicalAnalyzer lexicalAnalyzer;
+        private ToolStripMenuItem runToolStripMenuItem;
 
         public Form1()
         {
+            lexicalAnalyzer = new LexicalAnalyzer();
             InitializeComponent();
             InitializeCustomComponents();
+            InitializeKeyboardShortcuts();
         }
 
         private void InitializeCustomComponents()
         {
+            SplitContainer mainVerticalSplit = new SplitContainer();
+            mainVerticalSplit.Dock = DockStyle.Fill;
+            mainVerticalSplit.Orientation = Orientation.Horizontal;
+            mainVerticalSplit.SplitterDistance = this.Height / 2;
+            mainVerticalSplit.IsSplitterFixed = false;
+
+            Panel inputPanel = new Panel();
+            inputPanel.Dock = DockStyle.Fill;
+            CreateTabControl(inputPanel);
+            mainVerticalSplit.Panel1.Controls.Add(inputPanel);
+
+            Panel outputPanel = new Panel();
+            outputPanel.Dock = DockStyle.Fill;
+            outputPanel.BackColor = Color.White;
+            outputPanel.BorderStyle = BorderStyle.FixedSingle;
+
+            SplitContainer outputSplitContainer = new SplitContainer();
+            outputSplitContainer.Dock = DockStyle.Fill;
+            outputSplitContainer.Orientation = Orientation.Vertical;
+
+            Panel errorsPanel = new Panel();
+            errorsPanel.Dock = DockStyle.Fill;
+            errorsPanel.BackColor = Color.White;
+            errorsPanel.BorderStyle = BorderStyle.FixedSingle;
+
+            Label errorsLabel = new Label();
+            errorsLabel.Text = isRussianLanguage ? "ТАБЛИЦА ОШИБОК" : "ERRORS TABLE";
+            errorsLabel.Dock = DockStyle.Top;
+            errorsLabel.TextAlign = ContentAlignment.MiddleCenter;
+            errorsLabel.Font = new Font("Arial", 10, FontStyle.Bold);
+            errorsLabel.BackColor = Color.LightGray;
+            errorsLabel.Height = 25;
+            errorsPanel.Controls.Add(errorsLabel);
+
+            errorTabControl = new TabControl();
+            errorTabControl.Dock = DockStyle.Fill;
+
+            for (int i = 0; i < 5; i++)
+            {
+                TabPage errorTab = new TabPage($"Вкладка {i + 1}");
+
+                errorGridViews[i] = new DataGridView();
+                errorGridViews[i].Dock = DockStyle.Fill;
+                errorGridViews[i].AllowUserToAddRows = false;
+                errorGridViews[i].AllowUserToDeleteRows = false;
+                errorGridViews[i].ReadOnly = true;
+                errorGridViews[i].RowHeadersVisible = true;
+                errorGridViews[i].AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                errorGridViews[i].BackgroundColor = Color.White;
+                errorGridViews[i].Font = new Font("Consolas", 9);
+
+                errorGridViews[i].Columns.Add("Line", isRussianLanguage ? "Строка" : "Line");
+                errorGridViews[i].Columns.Add("Column", isRussianLanguage ? "Колонка" : "Column");
+                errorGridViews[i].Columns.Add("Error", isRussianLanguage ? "Ошибка" : "Error");
+                errorGridViews[i].Columns.Add("Description", isRussianLanguage ? "Описание" : "Description");
+                errorGridViews[i].Columns.Add("Code", isRussianLanguage ? "Код ошибки" : "Error Code");
+
+                errorGridViews[i].Columns["Line"].Width = 60;
+                errorGridViews[i].Columns["Column"].Width = 70;
+                errorGridViews[i].Columns["Error"].Width = 120;
+                errorGridViews[i].Columns["Description"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+                errorGridViews[i].Columns["Code"].Width = 90;
+
+                errorTab.Controls.Add(errorGridViews[i]);
+                errorTabControl.TabPages.Add(errorTab);
+            }
+
+            errorsPanel.Controls.Add(errorTabControl);
+
+            Panel outputTextPanel = new Panel();
+            outputTextPanel.Dock = DockStyle.Fill;
+            outputTextPanel.BackColor = Color.Black;
+            outputTextPanel.BorderStyle = BorderStyle.FixedSingle;
+
+            Label outputLabel = new Label();
+            outputLabel.Text = isRussianLanguage ? "ВЫВОД ПРОГРАММЫ" : "PROGRAM OUTPUT";
+            outputLabel.Dock = DockStyle.Top;
+            outputLabel.TextAlign = ContentAlignment.MiddleCenter;
+            outputLabel.Font = new Font("Arial", 10, FontStyle.Bold);
+            outputLabel.BackColor = Color.LightGray;
+            outputLabel.Height = 25;
+            outputTextPanel.Controls.Add(outputLabel);
+
+            outputTextBox = new RichTextBox();
+            outputTextBox.Dock = DockStyle.Fill;
+            outputTextBox.ReadOnly = true;
+            outputTextBox.BackColor = Color.White;
+            outputTextBox.ForeColor = Color.Black;
+            outputTextBox.Font = new Font("Consolas", 10);
+            outputTextBox.WordWrap = true;
+            outputTextPanel.Controls.Add(outputTextBox);
+
+            outputSplitContainer.Panel1.Controls.Add(errorsPanel);
+            outputSplitContainer.Panel2.Controls.Add(outputTextPanel);
+
+            outputSplitContainer.Resize += (s, e) =>
+            {
+                if (outputSplitContainer.Width > 0)
+                    outputSplitContainer.SplitterDistance = outputSplitContainer.Width / 2;
+            };
+
+            if (outputSplitContainer.Width > 0)
+                outputSplitContainer.SplitterDistance = outputSplitContainer.Width / 2;
+            else
+                outputSplitContainer.SplitterDistance = 300;
+
+            outputSplitContainer.IsSplitterFixed = false;
+
+            outputPanel.Controls.Add(outputSplitContainer);
+            mainVerticalSplit.Panel2.Controls.Add(outputPanel);
+
+            tableLayoutPanel1.Controls.Clear();
+            tableLayoutPanel1.Controls.Add(mainVerticalSplit, 0, 0);
+
             statusStrip = new StatusStrip();
             statusLabel = new ToolStripStatusLabel("Ready");
             lineColumnLabel = new ToolStripStatusLabel("Ln: 1, Col: 1");
@@ -43,18 +162,181 @@ namespace WinFormsApp1
             this.Controls.Add(statusStrip);
             statusStrip.Dock = DockStyle.Bottom;
 
-            statusTimer = new System.Windows.Forms.Timer();
-            statusTimer.Interval = 100;
-            statusTimer.Tick += StatusTimer_Tick;
-            statusTimer.Start();
-
             this.AllowDrop = true;
             this.DragEnter += Form1_DragEnter;
             this.DragDrop += Form1_DragDrop;
 
-            CreateTabControl();
-
             AddMenuItems();
+            this.FormClosing += Form1_FormClosing;
+
+            // УБРАНО создание кнопки Пуск через код
+
+            runToolStripMenuItem = new ToolStripMenuItem();
+            runToolStripMenuItem.Text = isRussianLanguage ? "Пуск" : "Run";
+            runToolStripMenuItem.ShortcutKeys = Keys.F5;
+            runToolStripMenuItem.Click += StartAnalysis_Click;
+        }
+
+        private void InitializeKeyboardShortcuts()
+        {
+            this.KeyPreview = true;
+
+            this.KeyDown += (s, e) =>
+            {
+                if (e.Control && e.KeyCode == Keys.N)
+                {
+                    Click_button_create(s, e);
+                    e.Handled = true;
+                }
+                else if (e.Control && e.KeyCode == Keys.O)
+                {
+                    Click_button_open(s, e);
+                    e.Handled = true;
+                }
+                else if (e.Control && e.KeyCode == Keys.S)
+                {
+                    if (e.Shift)
+                        Click_button_save_as(s, e);
+                    else
+                        Click_burron_save(s, e);
+                    e.Handled = true;
+                }
+                else if (e.Control && e.KeyCode == Keys.Z)
+                {
+                    Undo_Click(s, e);
+                    e.Handled = true;
+                }
+                else if (e.Control && e.KeyCode == Keys.Y)
+                {
+                    Redo_Click(s, e);
+                    e.Handled = true;
+                }
+                else if (e.Control && e.KeyCode == Keys.X)
+                {
+                    Cut_Click(s, e);
+                    e.Handled = true;
+                }
+                else if (e.Control && e.KeyCode == Keys.C)
+                {
+                    Copy_Click(s, e);
+                    e.Handled = true;
+                }
+                else if (e.Control && e.KeyCode == Keys.V)
+                {
+                    Paste_Click(s, e);
+                    e.Handled = true;
+                }
+                else if (e.Control && e.KeyCode == Keys.A)
+                {
+                    SelectAll_Click(s, e);
+                    e.Handled = true;
+                }
+                else if (e.Control && e.KeyCode == Keys.F)
+                {
+                    FindText();
+                    e.Handled = true;
+                }
+                else if (e.Control && e.KeyCode == Keys.H)
+                {
+                    Help(s, e);
+                    e.Handled = true;
+                }
+                else if (e.Control && e.KeyCode == Keys.W)
+                {
+                    CloseCurrentTab();
+                    e.Handled = true;
+                }
+                else if (e.Control && e.KeyCode == Keys.Tab)
+                {
+                    SwitchToNextTab();
+                    e.Handled = true;
+                }
+                else if (e.Control && e.Shift && e.KeyCode == Keys.Tab)
+                {
+                    SwitchToPreviousTab();
+                    e.Handled = true;
+                }
+                else if (e.KeyCode == Keys.F5)
+                {
+                    StartAnalysis_Click(s, e);
+                    e.Handled = true;
+                }
+            };
+        }
+
+        private void FindText()
+        {
+            using (Form findForm = new Form())
+            {
+                findForm.Text = isRussianLanguage ? "Найти" : "Find";
+                findForm.Size = new Size(300, 150);
+                findForm.StartPosition = FormStartPosition.CenterParent;
+
+                TextBox findTextBox = new TextBox();
+                findTextBox.Location = new Point(10, 10);
+                findTextBox.Size = new Size(260, 20);
+
+                Button findButton = new Button();
+                findButton.Text = isRussianLanguage ? "Найти" : "Find";
+                findButton.Location = new Point(100, 40);
+                findButton.DialogResult = DialogResult.OK;
+
+                findForm.Controls.Add(findTextBox);
+                findForm.Controls.Add(findButton);
+
+                if (findForm.ShowDialog() == DialogResult.OK)
+                {
+                    RichTextBox currentTextBox = GetCurrentRichTextBox();
+                    if (currentTextBox != null && !string.IsNullOrEmpty(findTextBox.Text))
+                    {
+                        int startIndex = currentTextBox.SelectionStart + currentTextBox.SelectionLength;
+                        int foundIndex = currentTextBox.Text.IndexOf(findTextBox.Text, startIndex, StringComparison.OrdinalIgnoreCase);
+
+                        if (foundIndex >= 0)
+                        {
+                            currentTextBox.Select(foundIndex, findTextBox.Text.Length);
+                            currentTextBox.ScrollToCaret();
+                        }
+                        else
+                        {
+                            MessageBox.Show(isRussianLanguage ? "Текст не найден" : "Text not found");
+                        }
+                    }
+                }
+            }
+        }
+
+        private void CloseCurrentTab()
+        {
+            if (tabControl.TabPages.Count > 1)
+            {
+                TabPage currentTab = tabControl.SelectedTab;
+                if (CheckSaveBeforeClosing(currentTab))
+                {
+                    filePaths.Remove(currentTab);
+                    isModified.Remove(currentTab);
+                    tabControl.TabPages.Remove(currentTab);
+                }
+            }
+        }
+
+        private void SwitchToNextTab()
+        {
+            if (tabControl.TabPages.Count > 1)
+            {
+                int nextIndex = (tabControl.SelectedIndex + 1) % tabControl.TabPages.Count;
+                tabControl.SelectedIndex = nextIndex;
+            }
+        }
+
+        private void SwitchToPreviousTab()
+        {
+            if (tabControl.TabPages.Count > 1)
+            {
+                int prevIndex = tabControl.SelectedIndex - 1;
+                if (prevIndex < 0) prevIndex = tabControl.TabPages.Count - 1;
+                tabControl.SelectedIndex = prevIndex;
+            }
         }
 
         private void AddMenuItems()
@@ -72,38 +354,209 @@ namespace WinFormsApp1
             Edit.DropDownItems.Add(languageMenuItem);
         }
 
-        private void CreateTabControl()
+        private void CreateTabControl(Panel parentPanel)
         {
             tabControl = new TabControl();
             tabControl.Dock = DockStyle.Fill;
             tabControl.SelectedIndexChanged += TabControl_SelectedIndexChanged;
 
-            tableLayoutPanel1.Controls.Clear();
-
             string tabName = isRussianLanguage ? "Документ 1" : "Document 1";
             TabPage firstTab = new TabPage(tabName);
 
+            CreateTabContent(firstTab);
+
+            tabControl.TabPages.Add(firstTab);
+            filePaths[firstTab] = "";
+            isModified[firstTab] = false;
+
+            parentPanel.Controls.Add(tabControl);
+        }
+
+        private void CreateTabContent(TabPage tabPage)
+        {
             Panel textContainer = new Panel();
             textContainer.Dock = DockStyle.Fill;
 
             Panel tabLineNumbers = new Panel();
-            tabLineNumbers.BackColor = Color.LightGray;
+            tabLineNumbers.BackColor = Color.FromArgb(240, 240, 240);
             tabLineNumbers.Width = 40;
-            tabLineNumbers.Paint += (s, e) => LineNumbersPanel_Paint(s, e, textBox1);
             tabLineNumbers.Dock = DockStyle.Left;
+            tabLineNumbers.Paint += (s, e) => LineNumbersPanel_Paint(s, e, GetRichTextBoxForTab(tabPage));
 
-            textBox1.Dock = DockStyle.Fill;
+            CustomRichTextBox richTextBox = new CustomRichTextBox();
+            richTextBox.Dock = DockStyle.Fill;
+            richTextBox.TextChanged += (s, e) =>
+            {
+                TextBox1_TextChanged(s, e);
+                isModified[tabPage] = true;
+                UpdateTabTitle(tabPage);
+                HighlightSyntax(richTextBox);
+            };
+            richTextBox.SelectionChanged += (s, e) =>
+            {
+                TextBox1_SelectionChanged(s, e);
+                UpdateCursorPosition();
+            };
+            richTextBox.VScroll += (s, e) => tabLineNumbers.Invalidate();
+            richTextBox.Font = new Font("Consolas", 12);
+            richTextBox.WordWrap = false;
 
-            textContainer.Controls.Add(textBox1);
+            textContainer.Controls.Add(richTextBox);
             textContainer.Controls.Add(tabLineNumbers);
 
-            firstTab.Controls.Add(textContainer);
-            tabControl.TabPages.Add(firstTab);
+            tabPage.Controls.Add(textContainer);
+        }
 
-            filePaths[firstTab] = "";
+        private void HighlightSyntax(CustomRichTextBox richTextBox)
+        {
+            if (richTextBox == null) return;
 
-            tableLayoutPanel1.Controls.Add(tabControl, 0, 0);
-            tabControl.Dock = DockStyle.Fill;
+            int selectionStart = richTextBox.SelectionStart;
+            int selectionLength = richTextBox.SelectionLength;
+
+            string[] keywords = { "if", "else", "for", "while", "do", "switch", "case", "break",
+                                 "continue", "return", "int", "float", "double", "char", "string",
+                                 "bool", "void", "class", "public", "private", "protected", "static",
+                                 "const", "true", "false", "null", "this", "base", "using", "namespace", "let", "parseFloat" };
+
+            string[] types = { "int", "float", "double", "char", "string", "bool", "void", "object" };
+
+            string text = richTextBox.Text;
+
+            richTextBox.SelectAll();
+            richTextBox.SelectionColor = Color.Black;
+
+            int commentIndex = text.IndexOf("//");
+            while (commentIndex != -1)
+            {
+                int endLine = text.IndexOf('\n', commentIndex);
+                if (endLine == -1) endLine = text.Length;
+
+                richTextBox.Select(commentIndex, endLine - commentIndex);
+                richTextBox.SelectionColor = Color.Green;
+
+                commentIndex = text.IndexOf("//", endLine);
+            }
+
+            MatchCollection stringMatches = Regex.Matches(text, "\".*?\"");
+            foreach (Match match in stringMatches)
+            {
+                richTextBox.Select(match.Index, match.Length);
+                richTextBox.SelectionColor = Color.Brown;
+            }
+
+            stringMatches = Regex.Matches(text, "\'.*?\'");
+            foreach (Match match in stringMatches)
+            {
+                richTextBox.Select(match.Index, match.Length);
+                richTextBox.SelectionColor = Color.Brown;
+            }
+
+            foreach (string keyword in keywords)
+            {
+                MatchCollection matches = Regex.Matches(text, @"\b" + keyword + @"\b");
+                foreach (Match match in matches)
+                {
+                    richTextBox.Select(match.Index, match.Length);
+                    richTextBox.SelectionColor = Color.Blue;
+                }
+            }
+
+            foreach (string type in types)
+            {
+                MatchCollection matches = Regex.Matches(text, @"\b" + type + @"\b");
+                foreach (Match match in matches)
+                {
+                    richTextBox.Select(match.Index, match.Length);
+                    richTextBox.SelectionColor = Color.Teal;
+                }
+            }
+
+            MatchCollection numberMatches = Regex.Matches(text, @"\b\d+(?:\.\d+)?(?:e[+-]?\d+)?\b", RegexOptions.IgnoreCase);
+            foreach (Match match in numberMatches)
+            {
+                richTextBox.Select(match.Index, match.Length);
+                richTextBox.SelectionColor = Color.Red;
+            }
+
+            richTextBox.Select(selectionStart, selectionLength);
+            richTextBox.SelectionColor = Color.Black;
+        }
+
+        private RichTextBox GetRichTextBoxForTab(TabPage tabPage)
+        {
+            if (tabPage.Controls.Count > 0)
+            {
+                Panel container = tabPage.Controls[0] as Panel;
+                if (container != null && container.Controls.Count > 0)
+                {
+                    return container.Controls[0] as RichTextBox;
+                }
+            }
+            return null;
+        }
+
+        private void UpdateTabTitle(TabPage tabPage)
+        {
+            if (isModified.ContainsKey(tabPage) && isModified[tabPage])
+            {
+                string originalTitle = tabPage.Text;
+                if (!originalTitle.EndsWith("*"))
+                {
+                    tabPage.Text = originalTitle + "*";
+                }
+            }
+            else
+            {
+                tabPage.Text = tabPage.Text.TrimEnd('*');
+            }
+        }
+
+        private bool CheckSaveBeforeClosing(TabPage tabPage)
+        {
+            if (isModified.ContainsKey(tabPage) && isModified[tabPage])
+            {
+                string fileName = filePaths.ContainsKey(tabPage) && !string.IsNullOrEmpty(filePaths[tabPage])
+                    ? Path.GetFileName(filePaths[tabPage])
+                    : tabPage.Text.TrimEnd('*');
+
+                string message = isRussianLanguage
+                    ? $"Сохранить изменения в файле '{fileName}'?"
+                    : $"Save changes to file '{fileName}'?";
+
+                string caption = isRussianLanguage ? "Сохранение" : "Save";
+
+                DialogResult result = MessageBox.Show(message, caption,
+                    MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+
+                if (result == DialogResult.Yes)
+                {
+                    tabControl.SelectedTab = tabPage;
+                    Click_burron_save(null, null);
+                    return true;
+                }
+                else if (result == DialogResult.No)
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            foreach (TabPage tab in tabControl.TabPages)
+            {
+                if (!CheckSaveBeforeClosing(tab))
+                {
+                    e.Cancel = true;
+                    return;
+                }
+            }
         }
 
         private void LineNumbersPanel_Paint(object sender, PaintEventArgs e, RichTextBox targetTextBox)
@@ -115,7 +568,7 @@ namespace WinFormsApp1
 
             isUpdatingLineNumbers = true;
 
-            e.Graphics.Clear(Color.LightGray);
+            e.Graphics.Clear(Color.FromArgb(240, 240, 240));
 
             int firstIndex = currentTextBox.GetCharIndexFromPosition(new Point(0, 0));
             int firstLine = currentTextBox.GetLineFromCharIndex(firstIndex);
@@ -136,9 +589,8 @@ namespace WinFormsApp1
                 {
                     e.Graphics.DrawString(lineNumber.ToString(),
                         currentTextBox.Font,
-                        Brushes.Black,
-                        5,
-                        linePos.Y);
+                        Brushes.Gray,
+                        new PointF(5, linePos.Y));
                 }
             }
 
@@ -175,6 +627,7 @@ namespace WinFormsApp1
                 if (!string.IsNullOrEmpty(path))
                 {
                     tabControl.SelectedTab.Text = Path.GetFileName(path);
+                    isModified[tabControl.SelectedTab] = false;
                 }
             }
         }
@@ -225,14 +678,7 @@ namespace WinFormsApp1
                 {
                     lineColumnLabel.Text = $"Ln: {line + 1}, Col: {column + 1}";
                 }
-            }
-        }
 
-        private void StatusTimer_Tick(object sender, EventArgs e)
-        {
-            RichTextBox currentTextBox = GetCurrentRichTextBox();
-            if (currentTextBox != null)
-            {
                 int charCount = currentTextBox.TextLength;
                 int lineCount = currentTextBox.Lines.Length;
                 string currentPath = GetCurrentFilePath();
@@ -259,15 +705,6 @@ namespace WinFormsApp1
                     {
                         statusLabel.Text = $"File: {Path.GetFileName(currentPath)} | Size: {fileInfo.Length} bytes | Characters: {charCount}";
                     }
-                }
-            }
-
-            if (tabControl.SelectedTab != null)
-            {
-                Panel container = tabControl.SelectedTab.Controls[0] as Panel;
-                if (container != null && container.Controls.Count > 1)
-                {
-                    container.Controls[1].Invalidate();
                 }
             }
         }
@@ -298,31 +735,20 @@ namespace WinFormsApp1
                 string tabName = isRussianLanguage ? Path.GetFileName(filePath) : Path.GetFileName(filePath);
                 TabPage tabPage = new TabPage(tabName);
 
-                Panel textContainer = new Panel();
-                textContainer.Dock = DockStyle.Fill;
+                CreateTabContent(tabPage);
 
-                Panel tabLineNumbers = new Panel();
-                tabLineNumbers.BackColor = Color.LightGray;
-                tabLineNumbers.Width = 40;
-                tabLineNumbers.Dock = DockStyle.Left;
+                RichTextBox richTextBox = GetRichTextBoxForTab(tabPage);
+                if (richTextBox != null)
+                {
+                    richTextBox.Text = fileContent;
+                    HighlightSyntax(richTextBox as CustomRichTextBox);
+                }
 
-                RichTextBox richTextBox = new RichTextBox();
-                richTextBox.Dock = DockStyle.Fill;
-                richTextBox.Text = fileContent;
-                richTextBox.TextChanged += TextBox1_TextChanged;
-                richTextBox.SelectionChanged += TextBox1_SelectionChanged;
-                richTextBox.VScroll += TextBox1_Scroll;
-
-                tabLineNumbers.Paint += (s, ev) => LineNumbersPanel_Paint(s, ev, richTextBox);
-
-                textContainer.Controls.Add(richTextBox);
-                textContainer.Controls.Add(tabLineNumbers);
-
-                tabPage.Controls.Add(textContainer);
                 tabControl.TabPages.Add(tabPage);
                 tabControl.SelectedTab = tabPage;
 
                 filePaths[tabPage] = filePath;
+                isModified[tabPage] = false;
             }
             catch (Exception ex)
             {
@@ -337,7 +763,6 @@ namespace WinFormsApp1
         private void TabControl_SelectedIndexChanged(object sender, EventArgs e)
         {
             UpdateCursorPosition();
-
             currentFilePath = GetCurrentFilePath();
         }
 
@@ -346,9 +771,8 @@ namespace WinFormsApp1
             RichTextBox currentTextBox = GetCurrentRichTextBox();
             if (currentTextBox != null)
             {
-                currentTextBox.Font = new Font(currentTextBox.Font.FontFamily, newSize);
+                currentTextBox.Font = new Font("Consolas", newSize);
             }
-            textBox2.Font = new Font(textBox2.Font.FontFamily, newSize);
         }
 
         private void SetRussianLanguage()
@@ -403,11 +827,13 @@ namespace WinFormsApp1
             toolStripButton7.Text = "Вырезать";
             toolStripButton8.Text = "Вставить";
 
+            if (runToolStripMenuItem != null)
+                runToolStripMenuItem.Text = "Пуск";
+
             languageLabel.Text = "Язык: Русский";
             statusLabel.Text = "Готов к работе";
 
             UpdateTabTitles();
-
             UpdateCursorPosition();
         }
 
@@ -463,11 +889,13 @@ namespace WinFormsApp1
             toolStripButton7.Text = "Cut";
             toolStripButton8.Text = "Paste";
 
+            if (runToolStripMenuItem != null)
+                runToolStripMenuItem.Text = "Run";
+
             languageLabel.Text = "Language: English";
             statusLabel.Text = "Ready";
 
             UpdateTabTitles();
-
             UpdateCursorPosition();
         }
 
@@ -476,20 +904,246 @@ namespace WinFormsApp1
             for (int i = 0; i < tabControl.TabPages.Count; i++)
             {
                 TabPage tab = tabControl.TabPages[i];
+                string baseTitle;
 
                 if (filePaths.ContainsKey(tab) && !string.IsNullOrEmpty(filePaths[tab]))
                 {
-                    tab.Text = Path.GetFileName(filePaths[tab]);
+                    baseTitle = Path.GetFileName(filePaths[tab]);
                 }
                 else
                 {
                     if (isRussianLanguage)
                     {
-                        tab.Text = $"Документ {i + 1}";
+                        baseTitle = $"Документ {i + 1}";
                     }
                     else
                     {
-                        tab.Text = $"Document {i + 1}";
+                        baseTitle = $"Document {i + 1}";
+                    }
+                }
+
+                tab.Text = isModified.ContainsKey(tab) && isModified[tab] ? baseTitle + "*" : baseTitle;
+            }
+        }
+
+        private void StartAnalysis_Click(object sender, EventArgs e)
+        {
+            RichTextBox currentTextBox = GetCurrentRichTextBox();
+            if (currentTextBox == null) return;
+
+            string text = currentTextBox.Text;
+
+            for (int i = 0; i < 5; i++)
+            {
+                errorGridViews[i].Rows.Clear();
+                errorGridViews[i].Columns.Clear();
+            }
+            outputTextBox.Clear();
+
+            outputTextBox.SelectionColor = Color.Black;
+            outputTextBox.AppendText($"[{DateTime.Now:T}] Запуск лексического анализа...\n");
+            outputTextBox.AppendText($"Анализируемый текст ({text.Length} символов, {currentTextBox.Lines.Length} строк):\n");
+            outputTextBox.AppendText(new string('-', 50) + "\n");
+
+            var result = lexicalAnalyzer.Analyze(text);
+
+            DisplayAnalysisResults(result);
+        }
+
+        private void DisplayAnalysisResults(LexicalAnalysisResult result)
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                errorGridViews[i].Rows.Clear();
+                errorGridViews[i].Columns.Clear();
+            }
+
+            errorGridViews[0].Columns.Add("Code", "Код");
+            errorGridViews[0].Columns.Add("Type", "Тип лексемы");
+            errorGridViews[0].Columns.Add("Lexeme", "Лексема");
+            errorGridViews[0].Columns.Add("Location", "Позиция");
+
+            errorGridViews[0].Columns["Code"].Width = 50;
+            errorGridViews[0].Columns["Type"].Width = 120;
+            errorGridViews[0].Columns["Lexeme"].Width = 150;
+            errorGridViews[0].Columns["Location"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+
+            foreach (var token in result.Tokens)
+            {
+                int rowIndex = errorGridViews[0].Rows.Add(
+                    token.Code,
+                    token.Type,
+                    token.Lexeme,
+                    token.Location
+                );
+                errorGridViews[0].Rows[rowIndex].Tag = token;
+            }
+
+            errorGridViews[1].Columns.Add("Severity", "Тип");
+            errorGridViews[1].Columns.Add("Code", "Код");
+            errorGridViews[1].Columns.Add("Line", "Строка");
+            errorGridViews[1].Columns.Add("Position", "Позиция");
+            errorGridViews[1].Columns.Add("Message", "Сообщение");
+            errorGridViews[1].Columns.Add("Context", "Контекст");
+
+            errorGridViews[1].Columns["Severity"].Width = 80;
+            errorGridViews[1].Columns["Code"].Width = 70;
+            errorGridViews[1].Columns["Line"].Width = 50;
+            errorGridViews[1].Columns["Position"].Width = 60;
+            errorGridViews[1].Columns["Message"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            errorGridViews[1].Columns["Context"].Width = 150;
+
+            HighlightErrorsInText(result.Errors);
+
+            if (result.Errors.Count > 0)
+            {
+                outputTextBox.SelectionColor = Color.Black;
+                outputTextBox.AppendText($"\n[!] ОБНАРУЖЕНЫ ОШИБКИ: {result.Errors.Count}\n");
+                outputTextBox.AppendText("========================================\n");
+
+                foreach (var error in result.Errors)
+                {
+                    int rowIndex = errorGridViews[1].Rows.Add(
+                        error.Severity,
+                        error.ErrorCode,
+                        error.Line,
+                        error.Position,
+                        error.Message,
+                        error.Context ?? ""
+                    );
+                    errorGridViews[1].Rows[rowIndex].Tag = error;
+
+                    string severityColor = error.Severity == "КРИТИЧЕСКАЯ" ? "КРАСНЫЙ" :
+                                          error.Severity == "ПРЕДУПРЕЖДЕНИЕ" ? "ЖЕЛТЫЙ" : "ОРАНЖЕВЫЙ";
+
+                    outputTextBox.AppendText($"\n[{error.Severity}] {error.ErrorCode}: {error.Message}\n");
+                    outputTextBox.AppendText($"  Строка {error.Line}, позиция {error.Position}\n");
+
+                    if (!string.IsNullOrEmpty(error.Character))
+                    {
+                        outputTextBox.AppendText($"  Недопустимый символ: '{error.Character}'\n");
+                    }
+
+                    if (!string.IsNullOrEmpty(error.Context))
+                    {
+                        outputTextBox.AppendText($"  Контекст: {error.Context}\n");
+                        outputTextBox.AppendText($"  {' ',-10}^{new string('~', error.Position - 1)}\n");
+                    }
+                }
+
+                outputTextBox.AppendText("========================================\n");
+            }
+            else
+            {
+                outputTextBox.SelectionColor = Color.Black;
+                outputTextBox.AppendText($"\n[?] Ошибок не обнаружено. Все выражения корректны.\n");
+            }
+
+            errorGridViews[1].CellClick += ErrorGridView_CellClick;
+            errorGridViews[0].CellClick += ErrorGridView_CellClick;
+
+            outputTextBox.SelectionColor = Color.Black;
+            outputTextBox.AppendText($"\nСтатистика:\n");
+            outputTextBox.AppendText($"- Найдено лексем: {result.Tokens.Count}\n");
+            outputTextBox.AppendText($"- Обнаружено ошибок: {result.Errors.Count}\n");
+
+            errorTabControl.SelectedIndex = result.Errors.Count > 0 ? 1 : 0;
+        }
+
+        private void HighlightErrorsInText(List<LexicalError> errors)
+        {
+            RichTextBox currentTextBox = GetCurrentRichTextBox();
+            if (currentTextBox == null) return;
+
+            int selectionStart = currentTextBox.SelectionStart;
+            int selectionLength = currentTextBox.SelectionLength;
+
+            currentTextBox.SelectAll();
+            currentTextBox.SelectionBackColor = Color.White;
+
+            foreach (var error in errors)
+            {
+                string[] lines = currentTextBox.Lines;
+                int charIndex = 0;
+
+                for (int i = 0; i < error.Line - 1; i++)
+                {
+                    if (i < lines.Length)
+                        charIndex += lines[i].Length + 1;
+                }
+
+                charIndex += error.Position - 1;
+
+                if (charIndex >= 0 && charIndex < currentTextBox.TextLength)
+                {
+                    currentTextBox.Select(charIndex, error.Character?.Length ?? 1);
+
+                    if (error.Severity == "КРИТИЧЕСКАЯ")
+                        currentTextBox.SelectionBackColor = Color.LightCoral;
+                    else if (error.Severity == "ПРЕДУПРЕЖДЕНИЕ")
+                        currentTextBox.SelectionBackColor = Color.LightYellow;
+                    else
+                        currentTextBox.SelectionBackColor = Color.LightSalmon;
+                }
+            }
+
+            currentTextBox.Select(selectionStart, selectionLength);
+            currentTextBox.SelectionBackColor = Color.White;
+        }
+
+        private void ErrorGridView_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+
+            var grid = sender as DataGridView;
+            if (grid?.Rows[e.RowIndex].Tag is LexicalError error)
+            {
+                RichTextBox currentTextBox = GetCurrentRichTextBox();
+                if (currentTextBox != null)
+                {
+                    string[] lines = currentTextBox.Lines;
+                    int charIndex = 0;
+
+                    for (int i = 0; i < error.Line - 1; i++)
+                    {
+                        if (i < lines.Length)
+                            charIndex += lines[i].Length + 1;
+                    }
+
+                    charIndex += error.Position - 1;
+
+                    if (charIndex >= 0 && charIndex <= currentTextBox.TextLength)
+                    {
+                        currentTextBox.SelectionStart = charIndex;
+                        currentTextBox.SelectionLength = 1;
+                        currentTextBox.ScrollToCaret();
+                        currentTextBox.Focus();
+                    }
+                }
+            }
+            else if (grid?.Rows[e.RowIndex].Tag is LexicalToken token)
+            {
+                RichTextBox currentTextBox = GetCurrentRichTextBox();
+                if (currentTextBox != null)
+                {
+                    string[] lines = currentTextBox.Lines;
+                    int charIndex = 0;
+
+                    for (int i = 0; i < token.Line - 1; i++)
+                    {
+                        if (i < lines.Length)
+                            charIndex += lines[i].Length + 1;
+                    }
+
+                    charIndex += token.StartPosition - 1;
+                    int length = token.EndPosition - token.StartPosition + 1;
+
+                    if (charIndex >= 0 && charIndex + length <= currentTextBox.TextLength)
+                    {
+                        currentTextBox.SelectionStart = charIndex;
+                        currentTextBox.SelectionLength = length;
+                        currentTextBox.ScrollToCaret();
+                        currentTextBox.Focus();
                     }
                 }
             }
@@ -520,30 +1174,13 @@ namespace WinFormsApp1
             string tabName = isRussianLanguage ? $"Документ {tabNumber}" : $"Document {tabNumber}";
             TabPage tabPage = new TabPage(tabName);
 
-            Panel textContainer = new Panel();
-            textContainer.Dock = DockStyle.Fill;
+            CreateTabContent(tabPage);
 
-            Panel tabLineNumbers = new Panel();
-            tabLineNumbers.BackColor = Color.LightGray;
-            tabLineNumbers.Width = 40;
-            tabLineNumbers.Dock = DockStyle.Left;
-
-            RichTextBox richTextBox = new RichTextBox();
-            richTextBox.Dock = DockStyle.Fill;
-            richTextBox.TextChanged += TextBox1_TextChanged;
-            richTextBox.SelectionChanged += TextBox1_SelectionChanged;
-            richTextBox.VScroll += TextBox1_Scroll;
-
-            tabLineNumbers.Paint += (s, ev) => LineNumbersPanel_Paint(s, ev, richTextBox);
-
-            textContainer.Controls.Add(richTextBox);
-            textContainer.Controls.Add(tabLineNumbers);
-
-            tabPage.Controls.Add(textContainer);
             tabControl.TabPages.Add(tabPage);
             tabControl.SelectedTab = tabPage;
 
             filePaths[tabPage] = "";
+            isModified[tabPage] = false;
         }
 
         private void Click_burron_save(object sender, EventArgs e)
@@ -577,6 +1214,10 @@ namespace WinFormsApp1
             try
             {
                 System.IO.File.WriteAllText(currentPath, currentTextBox.Text);
+                isModified[tabControl.SelectedTab] = false;
+                UpdateTabTitle(tabControl.SelectedTab);
+
+                outputTextBox.AppendText($"[{DateTime.Now:T}] Файл сохранен: {currentPath}\n");
             }
             catch (Exception ex)
             {
@@ -613,6 +1254,8 @@ namespace WinFormsApp1
 
                         System.IO.File.WriteAllText(filePath, content);
                         SetCurrentFilePath(filePath);
+                        isModified[tabControl.SelectedTab] = false;
+                        UpdateTabTitle(tabControl.SelectedTab);
                     }
                     catch (Exception ex)
                     {
@@ -631,29 +1274,34 @@ namespace WinFormsApp1
             {
                 MessageBox.Show($"СПРАВКА ПО ПРОГРАММЕ\n" +
                     "МЕНЮ ФАЙЛ\n" +
-                    "Создать - создает новый документ\n" +
-                    "Открыть - открывает существующий файл\n" +
-                    "Сохранить - сохраняет текущий документ\n" +
-                    "Сохранить как - сохраняет документ под новым именем\n" +
+                    "Создать (Ctrl+N) - создает новый документ\n" +
+                    "Открыть (Ctrl+O) - открывает существующий файл\n" +
+                    "Сохранить (Ctrl+S) - сохраняет текущий документ\n" +
+                    "Сохранить как (Ctrl+Shift+S) - сохраняет документ под новым именем\n" +
                     "Выход - завершает работу программы\n\n" +
                     "МЕНЮ ПРАВКА\n" +
-                    "Отменить - отменяет последнее действие\n" +
-                    "Повторить - повторяет отмененное действие\n" +
-                    "Вырезать - вырезает выделенный текст\n" +
-                    "Копировать - копирует выделенный текст\n" +
-                    "Вставить - вставляет текст из буфера\n" +
-                    "Удалить - удаляет выделенный текст\n" +
-                    "Выделить все - выделяет весь текст\n" +
+                    "Отменить (Ctrl+Z) - отменяет последнее действие\n" +
+                    "Повторить (Ctrl+Y) - повторяет отмененное действие\n" +
+                    "Вырезать (Ctrl+X) - вырезает выделенный текст\n" +
+                    "Копировать (Ctrl+C) - копирует выделенный текст\n" +
+                    "Вставить (Ctrl+V) - вставляет текст из буфера\n" +
+                    "Удалить (Del) - удаляет выделенный текст\n" +
+                    "Выделить все (Ctrl+A) - выделяет весь текст\n" +
+                    "Найти (Ctrl+F) - поиск текста\n" +
                     "Размер текста - изменение размера шрифта\n" +
                     "Язык - переключение языка интерфейса\n\n" +
+                    "МЕНЮ ПУСК\n" +
+                    "Пуск (F5) - запуск лексического анализа\n\n" +
                     "МЕНЮ СПРАВКА\n" +
-                    "Вызов справки - открывает это окно\n" +
+                    "Вызов справки (Ctrl+H) - открывает это окно\n" +
                     "О программе - информация о программе\n\n" +
                     "ПАНЕЛЬ ИНСТРУМЕНТОВ\n" +
                     "Содержит кнопки быстрого доступа к основным функциям.\n\n" +
                     "ДОПОЛНИТЕЛЬНЫЕ ВОЗМОЖНОСТИ\n" +
-                    "Вкладки - работа с несколькими документами\n" +
+                    "Вкладки (Ctrl+Tab, Ctrl+Shift+Tab) - работа с несколькими документами\n" +
+                    "Закрыть вкладку (Ctrl+W) - закрывает текущую вкладку\n" +
                     "Нумерация строк - отображается слева от текста\n" +
+                    "Подсветка синтаксиса - автоматическая подсветка кода\n" +
                     "Строка состояния - информация о текущем документе\n" +
                     "Drag-and-Drop - перетаскивание файлов в окно",
                     "", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -662,29 +1310,34 @@ namespace WinFormsApp1
             {
                 MessageBox.Show($"PROGRAM HELP\n" +
                     "FILE MENU\n" +
-                    "New - creates a new document\n" +
-                    "Open - opens an existing file\n" +
-                    "Save - saves the current document\n" +
-                    "Save As - saves the document with a new name\n" +
+                    "New (Ctrl+N) - creates a new document\n" +
+                    "Open (Ctrl+O) - opens an existing file\n" +
+                    "Save (Ctrl+S) - saves the current document\n" +
+                    "Save As (Ctrl+Shift+S) - saves the document with a new name\n" +
                     "Exit - exits the program\n\n" +
                     "EDIT MENU\n" +
-                    "Undo - undoes the last action\n" +
-                    "Redo - redoes the undone action\n" +
-                    "Cut - cuts the selected text\n" +
-                    "Copy - copies the selected text\n" +
-                    "aste - pastes text from the clipboard\n" +
-                    "Delete - deletes the selected text\n" +
-                    "Select All - selects all text\n" +
+                    "Undo (Ctrl+Z) - undoes the last action\n" +
+                    "Redo (Ctrl+Y) - redoes the undone action\n" +
+                    "Cut (Ctrl+X) - cuts the selected text\n" +
+                    "Copy (Ctrl+C) - copies the selected text\n" +
+                    "Paste (Ctrl+V) - pastes text from the clipboard\n" +
+                    "Delete (Del) - deletes the selected text\n" +
+                    "Select All (Ctrl+A) - selects all text\n" +
+                    "Find (Ctrl+F) - search text\n" +
                     "Text size - changes the font size\n" +
                     "Language - switches the interface language\n\n" +
+                    "RUN MENU\n" +
+                    "Run (F5) - start lexical analysis\n\n" +
                     "HELP MENU\n" +
-                    "Call help - opens this window\n" +
+                    "Call help (Ctrl+H) - opens this window\n" +
                     "About - information about the program\n\n" +
                     "TOOLBAR\n" +
                     "Contains quick access buttons for main functions.\n\n" +
                     "ADDITIONAL FEATURES\n" +
-                    "Tabs - work with multiple documents\n" +
+                    "Tabs (Ctrl+Tab, Ctrl+Shift+Tab) - work with multiple documents\n" +
+                    "Close tab (Ctrl+W) - closes the current tab\n" +
                     "Line numbering - displayed to the left of the text\n" +
+                    "Syntax highlighting - automatic code highlighting\n" +
                     "Status bar - information about the current document\n" +
                     "Drag-and-Drop - drag files into the window",
                     "", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -713,64 +1366,88 @@ namespace WinFormsApp1
 
         private void Undo_Click(object sender, EventArgs e)
         {
-            if (textBox1.CanUndo)
+            RichTextBox currentTextBox = GetCurrentRichTextBox();
+            if (currentTextBox != null && currentTextBox.CanUndo)
             {
-                textBox1.Undo();
+                currentTextBox.Undo();
             }
         }
 
         private void Redo_Click(object sender, EventArgs e)
         {
-            if (textBox1.CanRedo)
+            RichTextBox currentTextBox = GetCurrentRichTextBox();
+            if (currentTextBox != null && currentTextBox.CanRedo)
             {
-                textBox1.Redo();
+                currentTextBox.Redo();
             }
         }
 
         private void Cut_Click(object sender, EventArgs e)
         {
-            if (textBox1.SelectedText.Length > 0)
+            RichTextBox currentTextBox = GetCurrentRichTextBox();
+            if (currentTextBox != null && currentTextBox.SelectedText.Length > 0)
             {
-                textBox1.Cut();
+                currentTextBox.Cut();
             }
         }
 
         private void Copy_Click(object sender, EventArgs e)
         {
-            if (textBox1.SelectedText.Length > 0)
+            RichTextBox currentTextBox = GetCurrentRichTextBox();
+            if (currentTextBox != null && currentTextBox.SelectedText.Length > 0)
             {
-                textBox1.Copy();
+                currentTextBox.Copy();
             }
         }
 
         private void Paste_Click(object sender, EventArgs e)
         {
-            if (Clipboard.ContainsText())
+            RichTextBox currentTextBox = GetCurrentRichTextBox();
+            if (currentTextBox != null && Clipboard.ContainsText())
             {
-                textBox1.Paste();
+                currentTextBox.Paste();
             }
         }
+
         private void Delete_Click(object sender, EventArgs e)
         {
-            if (textBox1.SelectedText.Length > 0)
+            RichTextBox currentTextBox = GetCurrentRichTextBox();
+            if (currentTextBox != null && currentTextBox.SelectedText.Length > 0)
             {
-                int selectionStart = textBox1.SelectionStart;
-                int selectionLength = textBox1.SelectionLength;
+                int selectionStart = currentTextBox.SelectionStart;
+                int selectionLength = currentTextBox.SelectionLength;
 
-                textBox1.Text = textBox1.Text.Remove(selectionStart, selectionLength);
-
-                textBox1.SelectionStart = selectionStart;
+                currentTextBox.Text = currentTextBox.Text.Remove(selectionStart, selectionLength);
+                currentTextBox.SelectionStart = selectionStart;
             }
         }
 
         private void SelectAll_Click(object sender, EventArgs e)
         {
-            textBox1.SelectAll();
+            RichTextBox currentTextBox = GetCurrentRichTextBox();
+            if (currentTextBox != null)
+            {
+                currentTextBox.SelectAll();
+            }
         }
 
         private void Button_exit(object sender, EventArgs e)
         {
             this.Close();
+        }
+
+        private void startToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            StartAnalysis_Click(sender, e);
+        }
+    }
+
+    public class CustomRichTextBox : RichTextBox
+    {
+        public CustomRichTextBox()
+        {
+            this.DetectUrls = false;
+            this.WordWrap = false;
         }
     }
 }
